@@ -78,6 +78,7 @@ func actionInstall(ctx context.Context, cmd *cli.Command) error {
 				Version: cmd.String("version"),
 			}
 			err = pkg.FromRemote(userUrl.String())
+			defer pkg.CleanupRemote()
 		}
 		return err
 	}
@@ -211,6 +212,7 @@ func (p *Package) From(filepath string) error {
 // Expects Name and Version to be set.
 func (p *Package) FromRemote(tarballUrl string) error {
 	tarballPath, err := p.downloadRemote(tarballUrl)
+	defer p.CleanupRemote()
 	if err != nil {
 		return err
 	}
@@ -227,9 +229,8 @@ func (p *Package) install() error {
 }
 
 // downloadRemote downloads a tarball from a remote URL and returns the path to the temporary file.
-// Callers should os.Remove() the returned filepath after use.
 func (p *Package) downloadRemote(tarballUrl string) (string, error) {
-	tempFile, err := os.CreateTemp("", path.Base(p.Id+tarballUrl))
+	tempFile, err := os.CreateTemp("", generateId()+path.Base(tarballUrl))
 	if err != nil {
 		slog.Error("failed to create temporary file for remote download")
 		return "", err
@@ -249,8 +250,4 @@ func (p *Package) downloadRemote(tarballUrl string) (string, error) {
 	}
 
 	return tempFile.Name(), nil
-}
-
-func installPackageFile(path string) error {
-	return errors.New("unimplemented")
 }
