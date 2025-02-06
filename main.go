@@ -35,7 +35,17 @@ func main() {
 					&cli.BoolFlag{
 						Name:    "file",
 						Aliases: []string{"f"},
-						Usage:   "install a package from a local file",
+						Usage:   "Install a package from a local file.",
+					},
+					&cli.StringFlag{
+						Name:    "name",
+						Aliases: []string{"n"},
+						Usage:   "Set the name of this package. Required if not using GitHub.",
+					},
+					&cli.StringFlag{
+						Name:    "version",
+						Aliases: []string{"v"},
+						Usage:   "Set the version of this package. Required if not using GitHub.",
 					},
 				},
 				Usage:       "install a package",
@@ -51,16 +61,20 @@ func main() {
 }
 
 func actionInstall(ctx context.Context, cmd *cli.Command) error {
+	reqPath := cmd.Args().Get(0)
+	if reqPath == "" {
+		return errors.New("A package URL or filepath (--file) is required. See --help install.")
+	}
+
 	if cmd.Bool("file") {
-		return errors.New("file unimplemented")
-	} else {
-		// assume URL
-		userUrlRaw := cmd.Args().Get(0)
-		if userUrlRaw == "" {
-			return errors.New("A package URL is required. See --help install.")
+		pkg, err := packageWithCmdMetadata(cmd)
+		if err != nil {
+			return err
 		}
 
-		userUrl, err := url.ParseRequestURI(userUrlRaw)
+		return pkg.From(cmd.Args().Get(0))
+	} else {
+		userUrl, err := url.ParseRequestURI(reqPath)
 		if err != nil {
 			slog.Error("The URL provided was invalid.")
 			return err
@@ -73,14 +87,26 @@ func actionInstall(ctx context.Context, cmd *cli.Command) error {
 		if getGithubRepoName(userUrl) != "" {
 			pkg, err = packageFromGithub(userUrl)
 		} else {
-			pkg = &Package{
-				Name:    cmd.String("name"),
-				Version: cmd.String("version"),
+			pkg, err = packageWithCmdMetadata(cmd)
+			if err != nil {
+				return err
 			}
 			err = pkg.FromRemote(userUrl.String())
 			defer pkg.CleanupRemote()
 		}
 		return err
+	}
+}
+
+func packageWithCmdMetadata(cmd *cli.Command) (*Package, error) {
+	name := cmd.String("name")
+	version := cmd.String("version")
+	if name == "" || version == "" {
+		return nil, errors.New("A name and version must be provided. See --help install for more info.")
+	}
+	return &Package{
+		Name:    name,
+		Version: version,
 	}
 }
 
