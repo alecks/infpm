@@ -107,7 +107,7 @@ func packageWithCmdMetadata(cmd *cli.Command) (*Package, error) {
 	return &Package{
 		Name:    name,
 		Version: version,
-	}
+	}, nil
 }
 
 type githubApiReleases struct {
