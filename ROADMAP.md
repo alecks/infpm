@@ -4,7 +4,8 @@
     - [ ] allow selecting an asset other than the guessed potential assets
     - [ ] user input helper
 - [ ] installation
-    - [ ] download and extract (tarball)
+    - [x] download remote
+    - [ ] extract (tarball)
     - [ ] install to a package dir, symlink to .local
     - [ ] ensure correct package structure
     - [ ] manage conflict between packages with wrapper scripts
