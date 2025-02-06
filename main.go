@@ -208,7 +208,7 @@ func (p *Package) From(filepath string) error {
 	return p.install()
 }
 
-// FromRemote downloads and installs a package from a remote URL. Call CleanupRemote afterwards to delete temporary dirs.
+// FromRemote downloads and installs a package from a remote URL.
 // Expects Name and Version to be set.
 func (p *Package) FromRemote(tarballUrl string) error {
 	tarballPath, err := p.downloadRemote(tarballUrl)
