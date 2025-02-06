@@ -134,7 +134,7 @@ func getFullGithubUrl(u *url.URL) (string, error) {
 		// TODO: Allow choosing assets outwith the guessed potential assets.
 		chosenAssetIdx := -1
 		for chosenAssetIdx >= len(potentialAssets) || chosenAssetIdx < 0 {
-			fmt.Printf("Please choose an asset to install, or press return to view more assets: ")
+			fmt.Printf("Please choose an asset to install: ")
 			_, err = fmt.Scanln(&chosenAssetIdx)
 			if err != nil {
 				panic(err)
