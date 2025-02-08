@@ -28,7 +28,7 @@ func main() {
 			{
 				Name:      "install",
 				Aliases:   []string{"i"},
-				ArgsUsage: "[url|filepath]",
+				ArgsUsage: "<url|filepath>",
 				Flags: []cli.Flag{
 					&cli.BoolFlag{
 						Name:    "file",
@@ -46,9 +46,11 @@ func main() {
 						Usage:   "Set the version of this package. Required if not using GitHub.",
 					},
 				},
-				Usage:       "install a package",
-				Description: "Installs a package from the given URL. This can be a link to a GitHub repo, e.g. https://github.com/alecks/infpm, in which case it will download the latest release for your system. Otherwise, you can provide a specific URL or filepath for a tarball. Use the -f flag if providing a local file.",
-				Action:      actionInstall,
+				Usage: "Install a package",
+				Description: "Installs a package from the given remote/local tarball or GitHub repository.\n" +
+					"If this is a GitHub URL in the form https://github.com/user/repo, infpm will use the GitHub API to list the latest assets.\n" +
+					"Otherwise, it will download a tarball directly from the given URL, or use a local file if -f is set.",
+				Action: actionInstall,
 			},
 		},
 	}
