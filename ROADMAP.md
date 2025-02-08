@@ -4,10 +4,9 @@
     - [ ] allow selecting an asset other than the guessed potential assets
     - [ ] user input helper
 - [ ] installation
-    - [x] download remote
-    - [ ] extract (tarball)
-    - [ ] install to a package dir, symlink to .local
+    - [x] R: download remote
+    - [x] R: extract (tarball)
     - [ ] ensure correct package structure
+    - [ ] R: symlink to .local
     - [ ] manage conflict between packages with wrapper scripts
-    - [ ] possibly use a sqlite database but this might not be necessary
 
