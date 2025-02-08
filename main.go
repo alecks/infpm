@@ -16,10 +16,10 @@ const DEFAULT_STORE_PATH = "./test/infpm"
 var alternativeArchKeywords = map[string]string{"darwin": "macos", "amd64": "x86"}
 
 func main() {
-	logHdl := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+	slogHdl := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
 	})
-	slog.SetDefault(slog.New(logHdl))
+	slog.SetDefault(slog.New(slogHdl))
 
 	cmd := &cli.Command{
 		Name:  "infpm",
