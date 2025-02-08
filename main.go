@@ -16,6 +16,11 @@ const DEFAULT_STORE_PATH = "./test/infpm"
 var alternativeArchKeywords = map[string]string{"darwin": "macos", "amd64": "x86"}
 
 func main() {
+	logHdl := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+	slog.SetDefault(slog.New(logHdl))
+
 	cmd := &cli.Command{
 		Name:  "infpm",
 		Usage: "A minimal rootless package manager",
@@ -96,6 +101,7 @@ func actionInstall(ctx context.Context, cmd *cli.Command) error {
 			version = asset.Version
 			downloadUrl = asset.Url
 		}
+
 		ppkg = &PreinstallPackage{}
 		if err := ppkg.FromRemote(downloadUrl); err != nil {
 			ppkg.Cleanup()
