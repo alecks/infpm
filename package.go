@@ -26,8 +26,7 @@ type PreinstallPackage struct {
 
 	// Id does NOT uniquely identify the package (it might, but it might not). Use FullPath instead.
 	Id string
-	// FullPath is the result of joining the Name, Version and Id. Can be used to uniquely identify the package.
-	// This is made using filepath.Join, so it will use \ on Windows.
+	// FullPath is the result of joining the Name, Version and Id with filepath. Can be used to uniquely identify the package.
 	// TODO: this is quite intuitive, but might seem a bit weird.
 	FullPath    string
 	Initialised bool
@@ -191,8 +190,13 @@ func (ppkg *PreinstallPackage) Install(storePath string, interactive bool) (*Pac
 		return nil, err
 	}
 
-	// TODO: extract
-	slog.Warn("got to extraction TODO")
+	slog.Info("extracting archive", "package", pkg.Name, "path", pkg.Path)
+	if err := tarExtract(pkg.tarballReader, pkg.Path); err != nil {
+		return nil, err
+	}
+	// TODO: call cleanup here
+	// TODO: fixing directory structure
+	// TODO: symlinking
 
 	return pkg, nil
 }
@@ -208,14 +212,16 @@ func newPackageManager(storePath string, interactive bool) (*PackageManager, err
 		StorePath:   storePath,
 		Interactive: interactive,
 	}
-	if err := pm.Initialise(); err != nil {
+	if err := pm.Init(); err != nil {
 		slog.Error("failed to initialise PackageManager")
 		return nil, err
 	}
 	return pm, nil
 }
 
-func (pm *PackageManager) Initialise() error {
+// Init initialises the package manager, creating all needed directories.
+// Should usually not be called directly. Call newPackageManager instead.
+func (pm *PackageManager) Init() error {
 	if err := os.MkdirAll(pm.StorePath, 0755); err != nil {
 		slog.Error("failed to create store directory, do we have permission?", "storePath", pm.StorePath)
 		return err

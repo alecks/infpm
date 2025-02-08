@@ -4,10 +4,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
+	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
@@ -141,4 +144,18 @@ func generateId() string {
 		b[i] = idLetters[rand.Intn(len(idLetters))]
 	}
 	return string(b)
+}
+
+func tarExtract(from io.Reader, to string) error {
+	cmd := exec.Command("tar", "-xC", to)
+	cmd.Stdin = from
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		slog.Error("failed to extract archive with tar", "args", cmd.Args)
+		return err
+	}
+
+	return nil
 }
