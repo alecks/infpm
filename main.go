@@ -120,6 +120,6 @@ func actionInstall(ctx context.Context, cmd *cli.Command) error {
 		return err
 	}
 
-	slog.Info("done", "path", pkg.Path)
+	slog.Info("done", "path", pkg.FullPath)
 	return nil
 }

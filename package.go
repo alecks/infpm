@@ -16,9 +16,9 @@ type PreinstallPackage struct {
 	PreinstallPackageOpts
 	// Id does NOT uniquely identify the package (it might, but it might not). Use FullPath instead.
 	Id string
-	// FullPath is the result of joining the Name, Version and Id with filepath. Can be used to uniquely identify the package.
+	// Path is the result of joining the Name, Version and Id with filepath. Can be used to uniquely identify the package.
 	// TODO: this is quite intuitive, but might seem a bit weird.
-	FullPath    string
+	Path        string
 	Initialised bool
 
 	// tarballPath is the location of the tarball either provided or downloaded remotely.
@@ -48,7 +48,7 @@ func (p *PreinstallPackage) setOpts(opts PreinstallPackageOpts) error {
 
 	p.PreinstallPackageOpts = opts
 	p.Id = generateId()
-	p.FullPath = filepath.Join(p.Name, p.Version, p.Id)
+	p.Path = filepath.Join(p.Name, p.Version, p.Id)
 
 	return nil
 }
@@ -173,8 +173,8 @@ func (p *PreinstallPackage) readRemote(tarballUrl string) (io.ReadCloser, error)
 // Package represents a package that is installed.
 type Package struct {
 	*PreinstallPackage // copy to avoid issues with changing PreinstallPackage mid install
-	// Path is the location of the package in the store, i.e. its actual location before symlinking.
-	Path string
+	// FullPath is the location of the package in the store, i.e. its actual location before symlinking.
+	FullPath string
 	// Symlinked is whether the package has been symlinked from the store to ~/.local, etc.
 	Symlinked bool
 }
@@ -189,16 +189,16 @@ func (ppkg *PreinstallPackage) Install(storePath string, interactive bool) (*Pac
 
 	pkg := &Package{
 		PreinstallPackage: ppkg,
-		Path:              filepath.Join(storePath, ppkg.FullPath),
+		FullPath:          filepath.Join(storePath, ppkg.Path),
 		Symlinked:         false,
 	}
-	if err := os.MkdirAll(pkg.Path, 0755); err != nil {
-		slog.Error("failed to create package directory", "path", pkg.Path)
+	if err := os.MkdirAll(pkg.FullPath, 0755); err != nil {
+		slog.Error("failed to create package directory", "path", pkg.FullPath)
 		return nil, err
 	}
 
-	slog.Info("extracting archive", "package", pkg.Name, "path", pkg.Path)
-	if err := tarExtract(pkg.tarballReader, pkg.Path); err != nil {
+	slog.Info("extracting archive", "package", pkg.Name, "path", pkg.FullPath)
+	if err := tarExtract(pkg.tarballReader, pkg.FullPath); err != nil {
 		return nil, err
 	}
 	// TODO: call cleanup here
