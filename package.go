@@ -13,17 +13,7 @@ import (
 // PreinstallPackage represents a package which has not yet been installed.
 // Setting the Name and Version is required.
 type PreinstallPackage struct {
-	// Name is the name of the package to be installed.
-	Name string
-	// Version is the version of the package to be installed.
-	Version string
-	// RetainTarball specifies whether the tarball used during installation is kept afterwards.
-	// You likely want to set this to true if installing from a local file.
-	RetainTarball bool
-	// UseDisk determines whether the archive will be downloaded to a temp file, then extracted, or downloaded and extracted in-memory.
-	// Recommended to set to false unless you have limited RAM.
-	UseDisk bool
-
+	PreinstallPackageOpts
 	// Id does NOT uniquely identify the package (it might, but it might not). Use FullPath instead.
 	Id string
 	// FullPath is the result of joining the Name, Version and Id with filepath. Can be used to uniquely identify the package.
@@ -37,31 +27,41 @@ type PreinstallPackage struct {
 	tarballReader io.ReadCloser
 }
 
-// Init finalises a package's metadata, preparing it for installation.
-// Expects Name and Version to be set.
-func (p *PreinstallPackage) Init(name string, version string) error {
-	if version == "" || name == "" {
+// PreinstallPackageOpts specifies the required options to initialise a PreinstallPackage.
+type PreinstallPackageOpts struct {
+	Name    string
+	Version string
+	// UseDisk determines whether the archive will be downloaded to a temp file, then extracted, or downloaded and extracted in-memory.
+	// Recommended to set to false unless you have limited RAM.
+	UseDisk bool
+	// RetainTarball specifies whether the tarball used during installation is kept afterwards.
+	// You likely want to set this to true if installing from a local file.
+	RetainTarball bool
+}
+
+// setOpts finalises a package's metadata, preparing it for installation.
+// Expects Name and Version of opts to be set.
+func (p *PreinstallPackage) setOpts(opts PreinstallPackageOpts) error {
+	if opts.Version == "" || opts.Name == "" {
 		return errors.New("name and version must be non-empty to initialise PreinstallPackage")
 	}
-	if p.tarballReader == nil {
-		return errors.New("tarball reader was nil; was ReadFile or ReadRemote called?")
-	}
 
-	p.Name = name
-	p.Version = version
+	p.PreinstallPackageOpts = opts
 	p.Id = generateId()
 	p.FullPath = filepath.Join(p.Name, p.Version, p.Id)
 
-	slog.Info("package initialised and ready to install", "package", p.Name)
-	p.Initialised = true
 	return nil
 }
 
-// FromRemote downloads a tarball from a remote URL and finalises its metadata, preparing it for installation.
-// Expects Name and Version to be set.
+// NewPackageFromRemote downloads a tarball from a remote URL and finalises its metadata, preparing it for installation.
 // The caller should always run Cleanup to delete the tarball AFTER installation.
-func (p *PreinstallPackage) FromRemote(tarballUrl string) error {
-	if p.UseDisk {
+func NewPackageFromRemote(tarballUrl string, opts PreinstallPackageOpts) (*PreinstallPackage, error) {
+	p := &PreinstallPackage{}
+	if err := p.setOpts(opts); err != nil {
+		return nil, err
+	}
+
+	if opts.UseDisk {
 		if !p.RetainTarball {
 			slog.Warn("downloading to disk and NOT deleting the temporary archive after installation", "url", tarballUrl)
 		}
@@ -69,14 +69,14 @@ func (p *PreinstallPackage) FromRemote(tarballUrl string) error {
 		slog.Info("remote download: downloading archive to disk", "url", tarballUrl)
 		tarballPath, err := p.downloadRemote(tarballUrl)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		p.tarballPath = tarballPath
 		reader, err := os.Open(tarballPath)
 		if err != nil {
 			slog.Error("failed to open reader for tarball on disk")
-			return err
+			return nil, err
 		}
 		p.tarballReader = reader
 
@@ -85,17 +85,23 @@ func (p *PreinstallPackage) FromRemote(tarballUrl string) error {
 		slog.Info("remote download: reading archive into memory", "url", tarballUrl)
 		reader, err := p.readRemote(tarballUrl)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		p.tarballReader = reader
 
 		slog.Debug("remote reader set up, ready for initialisation")
 	}
 
-	return nil
+	// TODO: could turn this into a Ready function to check dynamically.
+	p.Initialised = true
+	return p, nil
 }
 
-func (p *PreinstallPackage) FromFile(fp string) error {
+func NewPackageFromFile(fp string, opts PreinstallPackageOpts) (*PreinstallPackage, error) {
+	p := &PreinstallPackage{}
+	if err := p.setOpts(opts); err != nil {
+		return nil, err
+	}
 	if !p.RetainTarball {
 		slog.Warn("local file: the tarball provided will be deleted after installation", "path", fp)
 	}
@@ -105,16 +111,17 @@ func (p *PreinstallPackage) FromFile(fp string) error {
 	if err != nil {
 		if os.IsNotExist(err) {
 			slog.Error("local file: file does not exist", "path", fp)
-			return err
+			return nil, err
 		}
 
 		slog.Error("local file: failed to open, do we have permission?", "path", fp)
-		return err
+		return nil, err
 	}
 
 	p.tarballPath = fp
 	p.tarballReader = reader
-	return nil
+	p.Initialised = true
+	return p, nil
 }
 
 // Cleanup should always be called after installation, or on error. Deletes the tarball used during installation
@@ -202,15 +209,22 @@ func (ppkg *PreinstallPackage) Install(storePath string, interactive bool) (*Pac
 }
 
 type PackageManager struct {
-	StorePath   string
-	Interactive bool
+	PackageManagerOpts
 	Initialised bool
 }
 
-func newPackageManager(storePath string, interactive bool) (*PackageManager, error) {
+type PackageManagerOpts struct {
+	StorePath   string
+	Interactive bool
+}
+
+func NewPackageManager(opts PackageManagerOpts) (*PackageManager, error) {
+	if opts.StorePath == "" {
+		return nil, errors.New("a StorePath must be provided to create a new package manager")
+	}
+
 	pm := &PackageManager{
-		StorePath:   storePath,
-		Interactive: interactive,
+		PackageManagerOpts: opts,
 	}
 	if err := pm.Init(); err != nil {
 		slog.Error("failed to initialise PackageManager")
@@ -236,7 +250,7 @@ func (pm *PackageManager) Init() error {
 
 func (pm *PackageManager) Install(ppkg *PreinstallPackage) (*Package, error) {
 	if !pm.Initialised {
-		return nil, errors.New("package manager was not initialised. Call PackageManager.Init")
+		return nil, errors.New("package manager was not initialised. was Init called?")
 	}
 	return ppkg.Install(pm.StorePath, pm.Interactive)
 }

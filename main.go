@@ -64,19 +64,21 @@ func actionInstall(ctx context.Context, cmd *cli.Command) error {
 		return errors.New("A package URL or filepath (--file) is required. See --help install.")
 	}
 
-	pm, err := newPackageManager(DEFAULT_STORE_PATH, true)
+	pm, err := NewPackageManager(PackageManagerOpts{StorePath: DEFAULT_STORE_PATH, Interactive: true})
 	if err != nil {
 		return err
 	}
 
-	name := cmd.String("name")
-	version := cmd.String("version")
+	opts := PreinstallPackageOpts{
+		Name:    cmd.String("name"),
+		Version: cmd.String("version"),
+	}
 	downloadUrl := reqPath
 	var ppkg *PreinstallPackage
 
 	if cmd.Bool("file") {
-		ppkg = &PreinstallPackage{RetainTarball: true}
-		if err := ppkg.FromFile(cmd.Args().Get(0)); err != nil {
+		opts.RetainTarball = true
+		if ppkg, err = NewPackageFromFile(reqPath, opts); err != nil {
 			ppkg.Cleanup()
 			return err
 		}
@@ -97,22 +99,15 @@ func actionInstall(ctx context.Context, cmd *cli.Command) error {
 				return err
 			}
 
-			name = asset.Name
-			version = asset.Version
+			opts.Name = asset.Name
+			opts.Version = asset.Version
 			downloadUrl = asset.Url
 		}
 
-		ppkg = &PreinstallPackage{}
-		if err := ppkg.FromRemote(downloadUrl); err != nil {
+		if ppkg, err = NewPackageFromRemote(downloadUrl, opts); err != nil {
 			ppkg.Cleanup()
 			return err
 		}
-	}
-
-	// TODO: reduce amount of ppkg.Cleanup calls. wish go had errdefer.
-	if err := ppkg.Init(name, version); err != nil {
-		ppkg.Cleanup()
-		return err
 	}
 
 	pkg, err := pm.Install(ppkg)

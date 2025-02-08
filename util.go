@@ -14,23 +14,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-
-	"github.com/urfave/cli/v3"
 )
-
-// packageWithCmdMetadata returns *Package initialised with the name and version provided to the CLI.
-// TODO: Try to infer name and version from the name of the tarball.
-func packageWithCmdMetadata(cmd *cli.Command) (*PreinstallPackage, error) {
-	name := cmd.String("name")
-	version := cmd.String("version")
-	if name == "" || version == "" {
-		return nil, errors.New("A name and version must be provided. See --help install for more info.")
-	}
-	return &PreinstallPackage{
-		Name:    name,
-		Version: version,
-	}, nil
-}
 
 // githubApiReleases represents the response from the GitHub API specified here:
 // https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#get-the-latest-releasetype
