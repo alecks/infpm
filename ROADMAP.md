@@ -10,6 +10,7 @@
     - [ ] ensure correct package structure
     - [ ] R: symlink to .local
     - [ ] manage conflict between packages with wrapper scripts
+    - [ ] R: smoother cleanups
 - [ ] deletion
     - ...
 - [ ] upgrading packages (installation then deletion)
