@@ -1,5 +1,7 @@
 # Roadmap
 
+R = required
+
 - [x] find release asset from github
     - [ ] allow selecting an asset other than the guessed potential assets
     - [ ] user input helper
@@ -10,7 +12,7 @@
     - [ ] ensure correct package structure
     - [ ] R: symlink to .local
     - [ ] manage conflict between packages with wrapper scripts
-    - [ ] R: smoother cleanups
+    - [x] R: smoother cleanups
 - [ ] deletion
     - ...
 - [ ] upgrading packages (installation then deletion)
