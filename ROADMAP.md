@@ -9,8 +9,8 @@ R = required
 - [ ] installation
     - [x] R: download remote
     - [x] R: extract (tarball)
-    - [ ] ensure correct package structure
-    - [ ] R: symlink to .local
+    - [x] ensure correct package structure
+    - [x] R: symlink to .local
     - [ ] manage conflict between packages with wrapper scripts
     - [x] R: smoother cleanups
 - [ ] deletion
