@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -182,14 +183,14 @@ type Package struct {
 // Install installs a package to the given storePath. If interactive is false, this will skip printing
 // some information and won't ask questions.
 // This should not usually be called directly. Instead, use PackageManager.Install.
-func (ppkg *PreinstallPackage) Install(storePath string, interactive bool) (*Package, error) {
+func (ppkg *PreinstallPackage) Install(opts PackageManagerOpts) (*Package, error) {
 	if !ppkg.Initialised {
 		return nil, errors.New("package is not initialised; has Init been called?")
 	}
 
 	pkg := &Package{
 		PreinstallPackage: ppkg,
-		FullPath:          filepath.Join(storePath, ppkg.Path),
+		FullPath:          filepath.Join(opts.StorePath, ppkg.Path),
 		Symlinked:         false,
 	}
 	if err := os.MkdirAll(pkg.FullPath, 0755); err != nil {
@@ -201,9 +202,93 @@ func (ppkg *PreinstallPackage) Install(storePath string, interactive bool) (*Pac
 	if err := tarExtract(pkg.tarballReader, pkg.FullPath); err != nil {
 		return nil, err
 	}
-	// TODO: call cleanup here
-	// TODO: fixing directory structure
-	// TODO: symlinking
+	ppkg.Cleanup()
+
+	topLevel := ""
+	executables := []string{}
+	dirs := []string{}
+
+	slog.Info("walking package dir to find relevant files", "path", pkg.FullPath)
+	err := filepath.WalkDir(pkg.FullPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if !d.IsDir() {
+			// check if executable
+			info, err := d.Info()
+			if err != nil {
+				return err
+			}
+
+			if info.Mode()&0111 != 0 {
+				slog.Info("found an executable", "path", path)
+				executables = append(executables, path)
+			}
+			return nil
+		}
+
+		dirname := d.Name()
+		if topLevel != "" {
+			// We've already found a bin/lib/share dir, so add to the list of other dirs.
+			dirs = append(dirs, path)
+			return filepath.SkipDir
+		} else if dirname == "bin" || dirname == "lib" || dirname == "share" {
+			topLevel = filepath.Dir(path)
+			slog.Info("found a bin, lib or share directory, using new base dir", "path", topLevel)
+
+			dirs = append(dirs, path)
+			return filepath.SkipDir
+		}
+
+		// We haven't yet found a bin/lib/share dir, so continue until we do.
+		return nil
+	})
+	if err != nil {
+		slog.Error("failed to walk package directory", "path", pkg.FullPath)
+		return nil, err
+	}
+
+	if topLevel != "" {
+		for _, srcBase := range dirs {
+			err := filepath.WalkDir(srcBase, func(src string, info fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+
+				relPath, err := filepath.Rel(topLevel, src)
+				if err != nil {
+					return err
+				}
+				dst := filepath.Join(opts.SymlinkPath, relPath)
+				if info.IsDir() {
+					return os.MkdirAll(dst, 0755)
+				}
+
+				if err := os.Symlink(src, dst); err != nil {
+					slog.Error("failed to link, continuing", "from", src, "to", dst, "err", err)
+				}
+				return nil
+			})
+
+			if err != nil {
+				slog.Error("failed to walk and link directory, continuing", "path", srcBase, "err", err)
+			} else {
+				slog.Info("linked directory recursively", "path", srcBase)
+			}
+		}
+	} else {
+		for _, e := range executables {
+			dest := filepath.Join(opts.SymlinkPath, "bin", filepath.Base(e))
+			if err := os.Symlink(e, dest); err != nil {
+				slog.Error("failed to link an executable", "from", e, "to", dest, "err", err)
+			} else {
+				slog.Info("linked executable", "from", e, "to", dest)
+			}
+		}
+	}
+
+	// TODO: deal with remaining files; option to delete them from the store, or symlink them
 
 	return pkg, nil
 }
@@ -214,13 +299,17 @@ type PackageManager struct {
 }
 
 type PackageManagerOpts struct {
-	StorePath   string
+	// StorePath is the place where installed packages are stored before they are symlinked.
+	// E.g. ~/.infpm/store.
+	StorePath string
+	// SymlinkPath is the place where installed packages are linked to, e.g. ~/.local or ~/.infpm/root.
+	SymlinkPath string
 	Interactive bool
 }
 
 func NewPackageManager(opts PackageManagerOpts) (*PackageManager, error) {
-	if opts.StorePath == "" {
-		return nil, errors.New("a StorePath must be provided to create a new package manager")
+	if opts.SymlinkPath == "" || opts.StorePath == "" {
+		return nil, errors.New("a StorePath and SymlinkPath must be provided to create a new package manager")
 	}
 
 	pm := &PackageManager{
@@ -234,16 +323,19 @@ func NewPackageManager(opts PackageManagerOpts) (*PackageManager, error) {
 }
 
 // Init initialises the package manager, creating all needed directories.
-// Should usually not be called directly. Call newPackageManager instead.
+// Should usually not be called directly. Call NewPackageManager instead.
 func (pm *PackageManager) Init() error {
 	if err := os.MkdirAll(pm.StorePath, 0755); err != nil {
 		slog.Error("failed to create store directory, do we have permission?", "storePath", pm.StorePath)
 		return err
 	}
 
-	// TODO: more stuff for initialisation
+	if err := os.MkdirAll(pm.SymlinkPath, 0755); err != nil {
+		slog.Error("failed to create symlink/root directory, do we have permission?", "symlinkPath", pm.SymlinkPath)
+		return err
+	}
 
-	slog.Info("package manager has been initialised", "storePath", pm.StorePath)
+	slog.Info("package manager has been initialised", "storePath", pm.StorePath, "symlinkPath", pm.SymlinkPath)
 	pm.Initialised = true
 	return nil
 }
@@ -252,5 +344,5 @@ func (pm *PackageManager) Install(ppkg *PreinstallPackage) (*Package, error) {
 	if !pm.Initialised {
 		return nil, errors.New("package manager was not initialised. was Init called?")
 	}
-	return ppkg.Install(pm.StorePath, pm.Interactive)
+	return ppkg.Install(pm.PackageManagerOpts)
 }

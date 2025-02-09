@@ -10,7 +10,10 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-const DEFAULT_STORE_PATH = "./test/infpm"
+const (
+	DEFAULT_STORE_PATH   = "./test/infpm/store"
+	DEFAULT_SYMLINK_PATH = "./test/infpm/root"
+)
 
 // TODO: See if there's any more of these to add.
 var alternativeArchKeywords = map[string]string{"darwin": "macos", "amd64": "x86"}
@@ -66,7 +69,11 @@ func actionInstall(ctx context.Context, cmd *cli.Command) error {
 		return errors.New("A package URL or filepath (--file) is required. See --help install.")
 	}
 
-	pm, err := NewPackageManager(PackageManagerOpts{StorePath: DEFAULT_STORE_PATH, Interactive: true})
+	pm, err := NewPackageManager(PackageManagerOpts{
+		StorePath:   DEFAULT_STORE_PATH,
+		SymlinkPath: DEFAULT_SYMLINK_PATH,
+		Interactive: true,
+	})
 	if err != nil {
 		return err
 	}
@@ -114,6 +121,7 @@ func actionInstall(ctx context.Context, cmd *cli.Command) error {
 
 	pkg, err := pm.Install(ppkg)
 	// Cleanup ASAP, don't defer.
+	// TODO: make cleanup automatic on error
 	ppkg.Cleanup()
 	if err != nil {
 		slog.Error("installation failed", "package", ppkg.Name, "from", downloadUrl)
